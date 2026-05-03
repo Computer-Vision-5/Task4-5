@@ -1,0 +1,5 @@
+set(__QT_DEPLOY_TARGET_facedetection_FILE G:/FaceRecognition/build/_deps/libfacedetection-build/libfacedetection.a)
+set(__QT_DEPLOY_TARGET_facedetection_TYPE STATIC_LIBRARY)
+set(__QT_DEPLOY_TARGET_FaceRecognition_FILE G:/FaceRecognition/build/FaceRecognition.exe)
+set(__QT_DEPLOY_TARGET_FaceRecognition_TYPE EXECUTABLE)
+set(__QT_DEPLOY_TARGET_FaceRecognition_RUNTIME_DLLS C:/Qt/6.11.0/mingw_64/bin/Qt6Widgets.dll;C:/Qt/6.11.0/mingw_64/bin/Qt6Gui.dll;C:/Qt/6.11.0/mingw_64/bin/Qt6Core.dll)

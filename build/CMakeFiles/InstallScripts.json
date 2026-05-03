@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"G:/FaceRecognition/build/cmake_install.cmake",
+		"G:/FaceRecognition/build/_deps/libfacedetection-build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
