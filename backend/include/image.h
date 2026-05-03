@@ -57,7 +57,7 @@ public:
 
         // Write PGM Header
         file << "P5\n" << img.width << " " << img.height << "\n255\n";
-        
+
         // Write binary pixel data
         file.write(reinterpret_cast<const char*>(img.data.data()), img.data.size());
 
@@ -90,7 +90,7 @@ public:
 
         int maxVal;
         file >> img.width >> img.height >> maxVal;
-        file.ignore(256, '\n'); 
+        file.ignore(256, '\n');
 
         img.data.resize(img.width * img.height);
         file.read(reinterpret_cast<char*>(img.data.data()), img.data.size() * 3);

@@ -55,6 +55,10 @@ private:
     QSpinBox *seedXSpinBox;
     QLabel *seedYLabel;
     QSpinBox *seedYSpinBox;
+    QLabel *windowSizeLabel;
+    QSpinBox *windowSizeSpinBox;
+    QLabel *cValueLabel;
+    QSpinBox *cValueSpinBox;
 
     // Status & Timing
     QLabel *statusLabel;

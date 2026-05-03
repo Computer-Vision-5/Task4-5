@@ -2,16 +2,17 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QCoreApplication>
+#include <QElapsedTimer>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setWindowTitle("Computer Vision Toolkit - Task 4");
     resize(1200, 750);
-    
+
     setupUI();
     applyStyleSheet();
 
     // Call once to set initial parameter visibility (Otsu is ID 0)
-    onMethodChanged(0); 
+    onMethodChanged(0);
 }
 
 // Catches the double-click event on the image label
@@ -42,9 +43,21 @@ void MainWindow::setupUI() {
     // -- Left: Parameters --
     kLabel = new QLabel("Clusters (k)");
     kSpinBox = new QSpinBox(); kSpinBox->setRange(2, 20); kSpinBox->setValue(4);
-    
+
     thresholdLabel = new QLabel("Threshold");
     thresholdSpinBox = new QSpinBox(); thresholdSpinBox->setRange(1, 255); thresholdSpinBox->setValue(20);
+
+    // Added Local Thresholding Parameters
+    windowSizeLabel = new QLabel("Window Size");
+    windowSizeSpinBox = new QSpinBox();
+    windowSizeSpinBox->setRange(3, 99);
+    windowSizeSpinBox->setSingleStep(2); // Keep it odd
+    windowSizeSpinBox->setValue(15);
+
+    cValueLabel = new QLabel("Constant C");
+    cValueSpinBox = new QSpinBox();
+    cValueSpinBox->setRange(-50, 50);
+    cValueSpinBox->setValue(10);
 
     spatialRadiusLabel = new QLabel("Spatial Radius");
     spatialRadiusSpinBox = new QDoubleSpinBox(); spatialRadiusSpinBox->setRange(1.0, 100.0); spatialRadiusSpinBox->setValue(20.0);
@@ -54,13 +67,15 @@ void MainWindow::setupUI() {
 
     seedXLabel = new QLabel("Seed X");
     seedXSpinBox = new QSpinBox(); seedXSpinBox->setRange(0, 5000);
-    
+
     seedYLabel = new QLabel("Seed Y");
     seedYSpinBox = new QSpinBox(); seedYSpinBox->setRange(0, 5000);
 
     QHBoxLayout *paramsLayout = new QHBoxLayout();
-    paramsLayout->addLayout(createParamLayout(kLabel, kSpinBox));
+    paramsLayout->addLayout(createParamLayout(kLabel, kSpinBox)); // Used for both K and Spectral Modes
     paramsLayout->addLayout(createParamLayout(thresholdLabel, thresholdSpinBox));
+    paramsLayout->addLayout(createParamLayout(windowSizeLabel, windowSizeSpinBox));
+    paramsLayout->addLayout(createParamLayout(cValueLabel, cValueSpinBox));
     paramsLayout->addLayout(createParamLayout(spatialRadiusLabel, spatialRadiusSpinBox));
     paramsLayout->addLayout(createParamLayout(colorRadiusLabel, colorRadiusSpinBox));
     paramsLayout->addLayout(createParamLayout(seedXLabel, seedXSpinBox));
@@ -72,14 +87,15 @@ void MainWindow::setupUI() {
     methodsLayout->setHorizontalSpacing(10);
     methodsLayout->setVerticalSpacing(10);
 
-    QStringList methods = {"Otsu", "Optimal", "K-Means", "Region Growing", "Mean Shift", "Agglomerative"};
+    // Added Spectral and Local to the list
+    QStringList methods = {"Otsu", "Optimal", "Spectral", "Local", "K-Means", "Region Growing", "Mean Shift", "Agglomerative"};
     for (int i = 0; i < methods.size(); ++i) {
         QPushButton *btn = new QPushButton(methods[i]);
         btn->setCheckable(true);
         btn->setCursor(Qt::PointingHandCursor);
         if (i == 0) btn->setChecked(true);
         methodGroup->addButton(btn, i);
-        methodsLayout->addWidget(btn, i / 3, i % 3); // 2 rows, 3 columns
+        methodsLayout->addWidget(btn, i / 4, i % 4); // 2 rows, 4 columns
     }
     connect(methodGroup, &QButtonGroup::idClicked, this, &MainWindow::onMethodChanged);
 
@@ -91,7 +107,7 @@ void MainWindow::setupUI() {
     processButton->setObjectName("applyButton");
     processButton->setEnabled(false);
     processButton->setCursor(Qt::PointingHandCursor);
-    
+
     rightLayout->addWidget(statusLabel);
     rightLayout->addWidget(timeLabel);
     rightLayout->addWidget(processButton);
@@ -150,7 +166,7 @@ void MainWindow::setupUI() {
 void MainWindow::applyStyleSheet() {
     QString style = R"(
         QMainWindow { background-color: #f0f4f8; }
-        
+
         /* Group Box Area */
         QGroupBox {
             background-color: #ffffff;
@@ -168,26 +184,26 @@ void MainWindow::applyStyleSheet() {
             padding: 0 10px;
             color: #263238;
         }
-        
+
         /* Labels above the input fields */
-        QLabel#paramLabel { 
+        QLabel#paramLabel {
             color: #0277bd; /* Deep Blue */
-            font-size: 12px; 
-            font-weight: bold; 
+            font-size: 12px;
+            font-weight: bold;
         }
-        
+
         /* Input Fields (The Number Boxes) */
-        QSpinBox, QDoubleSpinBox { 
-            border: 2px solid #4fc3f7; 
-            border-radius: 5px; 
-            padding: 4px; 
-            background-color: #ffffff; 
+        QSpinBox, QDoubleSpinBox {
+            border: 2px solid #4fc3f7;
+            border-radius: 5px;
+            padding: 4px;
+            background-color: #ffffff;
             color: #e91e63; /* Vivid Pink/Red for the numbers */
             font-weight: bold;
             font-size: 14px;
             min-width: 65px;
         }
-        
+
         /* The tiny Up/Down Arrow Buttons inside the fields */
         QSpinBox::up-button, QDoubleSpinBox::up-button {
             background-color: #81d4fa; /* Colorful Light Blue */
@@ -218,17 +234,17 @@ void MainWindow::applyStyleSheet() {
             font-size: 13px;
         }
         QPushButton:hover { background-color: #bbdefb; border: 2px solid #64b5f6; }
-        QPushButton:checked { 
+        QPushButton:checked {
             background-color: #ff9800; /* Vivid Orange for the active button */
-            color: white; 
+            color: white;
             border: 2px solid #f57c00;
         }
-        
+
         /* Main Process Image Button */
-        QPushButton#applyButton { 
+        QPushButton#applyButton {
             background-color: #673ab7; /* Deep Purple */
-            color: white; 
-            font-size: 14px; 
+            color: white;
+            font-size: 14px;
             font-weight: bold;
             padding: 8px 20px;
             border-radius: 6px;
@@ -236,7 +252,7 @@ void MainWindow::applyStyleSheet() {
         }
         QPushButton#applyButton:hover { background-color: #512da8; }
         QPushButton#applyButton:disabled { background-color: #cfd8dc; color: #90a4ae; }
-        
+
         /* Image Display Panels */
         QLabel#headerLabel { color: #34495e; font-weight: bold; font-size: 13px; }
         QLabel#imagePanel {
@@ -253,23 +269,32 @@ void MainWindow::applyStyleSheet() {
 
 void MainWindow::onMethodChanged(int id) {
     currentMethodId = id;
-    
+
     // Hide all parameters
     kLabel->hide(); kSpinBox->hide();
     thresholdLabel->hide(); thresholdSpinBox->hide();
+    windowSizeLabel->hide(); windowSizeSpinBox->hide();
+    cValueLabel->hide(); cValueSpinBox->hide();
     spatialRadiusLabel->hide(); spatialRadiusSpinBox->hide();
     colorRadiusLabel->hide(); colorRadiusSpinBox->hide();
     seedXLabel->hide(); seedXSpinBox->hide();
     seedYLabel->hide(); seedYSpinBox->hide();
 
     // Show only the ones needed for this specific algorithm
-    if (id == 2 || id == 5) { // K-Means, Agglomerative
+    if (id == 2) { // Spectral Thresholding
+        kLabel->setText("Modes");
         kLabel->show(); kSpinBox->show();
-    } else if (id == 3) { // Region Growing
+    } else if (id == 3) { // Local Thresholding
+        windowSizeLabel->show(); windowSizeSpinBox->show();
+        cValueLabel->show(); cValueSpinBox->show();
+    } else if (id == 4 || id == 7) { // K-Means, Agglomerative
+        kLabel->setText("Clusters (k)");
+        kLabel->show(); kSpinBox->show();
+    } else if (id == 5) { // Region Growing
         thresholdLabel->show(); thresholdSpinBox->show();
         seedXLabel->show(); seedXSpinBox->show();
         seedYLabel->show(); seedYSpinBox->show();
-    } else if (id == 4) { // Mean Shift
+    } else if (id == 6) { // Mean Shift
         spatialRadiusLabel->show(); spatialRadiusSpinBox->show();
         colorRadiusLabel->show(); colorRadiusSpinBox->show();
     }
@@ -283,7 +308,7 @@ void MainWindow::loadImage() {
         isImageLoaded = true;
         processButton->setEnabled(true);
         statusLabel->setText("<b>Status:</b> <span style='color:#27ae60;'>Image Loaded</span>");
-        
+
         seedXSpinBox->setMaximum(loadedQImage.width() - 1);
         seedYSpinBox->setMaximum(loadedQImage.height() - 1);
         seedXSpinBox->setValue(loadedQImage.width() / 2);
@@ -299,7 +324,7 @@ void MainWindow::loadImage() {
 
 void MainWindow::processImage() {
     if (!isImageLoaded) return;
-    
+
     statusLabel->setText("<b>Status:</b> <span style='color:#e67e22;'>Processing...</span>");
     timeLabel->setText("<b>Matching time:</b> Calculating...");
     QCoreApplication::processEvents(); // Force UI update
@@ -307,35 +332,44 @@ void MainWindow::processImage() {
     QElapsedTimer timer;
     timer.start(); // Start stopwatch
 
-    if (currentMethodId == 0 || currentMethodId == 1) {
+    // --- GRANTSCALE THRESHOLDING ALGORITHMS ---
+    if (currentMethodId >= 0 && currentMethodId <= 3) {
         GrayImage grayInput = qImageToGrayImage(loadedQImage);
-        GrayImage result = (currentMethodId == 0) ? 
-                           Thresholding::applyOtsuThresholding(grayInput) : 
-                           Thresholding::applyOptimalThresholding(grayInput);
+        GrayImage result;
+
+        if (currentMethodId == 0) {
+            result = Thresholding::applyOtsuThresholding(grayInput);
+        } else if (currentMethodId == 1) {
+            result = Thresholding::applyOptimalThresholding(grayInput);
+        } else if (currentMethodId == 2) {
+            result = Thresholding::applySpectralThresholding(grayInput, kSpinBox->value());
+        } else if (currentMethodId == 3) {
+            result = Thresholding::applyLocalThresholding(grayInput, windowSizeSpinBox->value(), cValueSpinBox->value());
+        }
         processedImageLabel->setPixmap(grayImageToQPixmap(result));
 
-    } else if (currentMethodId == 3) {
+    // --- REGION GROWING (Operates on Grayscale usually) ---
+    } else if (currentMethodId == 5) {
         GrayImage grayInput = qImageToGrayImage(loadedQImage);
         GrayImage result = Segmentation::applyRegionGrowing(grayInput, seedXSpinBox->value(), seedYSpinBox->value(), thresholdSpinBox->value());
         processedImageLabel->setPixmap(grayImageToQPixmap(result));
 
+    // --- COLOR SEGMENTATION ALGORITHMS ---
     } else {
-        // --- PREVENT FREEZING ON HEAVY ALGORITHMS ---
-        // Mean Shift is massive. If the image is large, it locks the UI thread.
-        // We dynamically scale the image down to a safe size just for this calculation.
+        // Prevent freezing on heavy algorithms
         QImage safeQImage = loadedQImage;
-        if (currentMethodId == 4 && safeQImage.width() > 100) {
+        if (currentMethodId == 6 && safeQImage.width() > 100) {
             safeQImage = safeQImage.scaledToWidth(100, Qt::SmoothTransformation);
         }
 
         ColorImage colorInput = qImageToColorImage(safeQImage);
         ColorImage result;
-        
-        if (currentMethodId == 2) {
+
+        if (currentMethodId == 4) {
             result = Segmentation::applyKMeans(colorInput, kSpinBox->value(), 10);
-        } else if (currentMethodId == 4) {
+        } else if (currentMethodId == 6) {
             result = Segmentation::applyMeanShift(colorInput, spatialRadiusSpinBox->value(), colorRadiusSpinBox->value(), 5);
-        } else if (currentMethodId == 5) {
+        } else if (currentMethodId == 7) {
             result = Segmentation::applyAgglomerative(colorInput, kSpinBox->value());
         }
         
