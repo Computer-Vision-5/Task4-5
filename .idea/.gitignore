@@ -8,3 +8,9 @@
 /dataSources.local.xml
 # Editor-based HTTP Client requests
 /httpRequests/
+# Ignore build directories and CMake artifacts
+build/
+CMakeCache.txt
+CMakeFiles/
+*.cmake
+Makefile
