@@ -1,3 +1,0 @@
-G:/FaceRecognition/build/_deps/libfacedetection-subbuild/CMakeFiles/libfacedetection-populate.dir
-G:/FaceRecognition/build/_deps/libfacedetection-subbuild/CMakeFiles/edit_cache.dir
-G:/FaceRecognition/build/_deps/libfacedetection-subbuild/CMakeFiles/rebuild_cache.dir

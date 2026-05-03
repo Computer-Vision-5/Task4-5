@@ -1,1 +1,0 @@
--IG:/FaceRecognition/build/FaceRecognition_autogen/include -I"G:/FaceRecognition/build/_deps/libfacedetection-src/src" -IG:/FaceRecognition/build -isystem C:/Qt/6.11.0/mingw_64/include/QtCore -isystem C:/Qt/6.11.0/mingw_64/include -isystem "C:/Qt/6.11.0/mingw_64/mkspecs/win32-g++" -isystem C:/Qt/6.11.0/mingw_64/include/QtGui -isystem C:/Qt/6.11.0/mingw_64/include/QtWidgets

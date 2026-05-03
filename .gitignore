@@ -1,7 +1,6 @@
 build/
 *.exe
+*.dll
 *.o
 *.obj
-*.dll
 *.log
-*.user

@@ -1,2 +1,0 @@
-C:\mingw64\bin\ar.exe qc libfacedetection.a "CMakeFiles/facedetection.dir/src/facedetectcnn-data.cpp.obj" "CMakeFiles/facedetection.dir/src/facedetectcnn-model.cpp.obj" CMakeFiles/facedetection.dir/src/facedetectcnn.cpp.obj
-C:\mingw64\bin\ranlib.exe libfacedetection.a
