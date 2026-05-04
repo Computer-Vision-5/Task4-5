@@ -4,6 +4,7 @@
 #include <QImage>
 #include <QString>
 #include <QStringList>
+#include <QRect>
 #include <vector>
 #include <string>
 
@@ -18,7 +19,12 @@ public:
     //  preprocessFace(crop) → grayscale, resize to FACE_H×FACE_W, flatten
     //                         to a 1-D float vector of length FACE_DIM.
 
-    QImage             detectAndCrop(const QImage &img) const;
+    struct DetectResult {
+        QImage crop;
+        QRect rect;
+    };
+
+    DetectResult       detectAndCrop(const QImage &img) const;
     std::vector<float> preprocessFace(const QImage &crop) const;
 
     // ── B.1  Training (one-time, at startup) ────────────────────────────────

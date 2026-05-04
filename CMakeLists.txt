@@ -26,10 +26,14 @@ add_executable(FaceRecognition
   main.cpp
   frontend/mainwindow.cpp
   frontend/mainwindow.h
+  frontend/ROCPlotDialog.cpp
+  frontend/ROCPlotDialog.h
   backend/FaceDetector.cpp
   backend/FaceDetector.h
   backend/FaceRecognizer.cpp
   backend/FaceRecognizer.h
+  backend/ModelEvaluator.cpp
+  backend/ModelEvaluator.h
 )
 
 target_include_directories(FaceRecognition PRIVATE 

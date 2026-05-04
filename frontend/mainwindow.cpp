@@ -10,6 +10,8 @@
 #include <QApplication>
 #include <QPushButton>
 #include "../backend/FaceDetector.h"
+#include "../backend/ModelEvaluator.h"
+#include "ROCPlotDialog.h"
 
 static QString makeButtonStyle(const QString &bg, const QString &hover, const QString &press)
 {
@@ -45,18 +47,24 @@ MainWindow::MainWindow(QWidget *parent)
 
     // ── Button row ───────────────────────────────────────────────────────────
     trainButton  = new QPushButton("Train on Dataset",        this);
-    uploadButton = new QPushButton("recognize Single Image",  this);
+    uploadButton = new QPushButton("Recognize Single Image",  this);
+    evalButton   = new QPushButton("Evaluate Test Set",       this);
 
     trainButton ->setStyleSheet(makeButtonStyle("#198754", "#157347", "#146c43"));
     uploadButton->setStyleSheet(makeButtonStyle("#0d6efd", "#0b5ed7", "#0a58ca"));
+    evalButton  ->setStyleSheet(makeButtonStyle("#ffc107", "#ffb300", "#ff8f00"));
+    evalButton  ->setStyleSheet(evalButton->styleSheet() + "QPushButton { color: #212529; }"); // Dark text for yellow button
 
     uploadButton->setEnabled(false);
+    evalButton->setEnabled(false);
 
     QHBoxLayout *btnRow = new QHBoxLayout();
     btnRow->addStretch();
     btnRow->addWidget(trainButton);
     btnRow->addSpacing(12);
     btnRow->addWidget(uploadButton);
+    btnRow->addSpacing(12);
+    btnRow->addWidget(evalButton);
     btnRow->addStretch();
     root->addLayout(btnRow);
 
@@ -95,6 +103,7 @@ MainWindow::MainWindow(QWidget *parent)
     // ── Connections ──────────────────────────────────────────────────────────
     connect(trainButton,  &QPushButton::clicked, this, &MainWindow::trainModel);
     connect(uploadButton, &QPushButton::clicked, this, &MainWindow::uploadImage);
+    connect(evalButton,   &QPushButton::clicked, this, &MainWindow::evaluateModel);
 
     // Try to load a previously saved model as soon as the event loop starts
     QTimer::singleShot(0, this, &MainWindow::loadExistingModel);
@@ -117,6 +126,7 @@ void MainWindow::loadExistingModel()
             .arg(m_recognizer.numSubjects()));
         statusBar()->showMessage("Model loaded from " + modelPath);
         uploadButton->setEnabled(true);
+        evalButton->setEnabled(true);
     } else {
         resultLabel->setText("No saved model found. Please train on a dataset folder.");
         statusBar()->showMessage("No model found. Please train first.");
@@ -136,6 +146,7 @@ void MainWindow::trainModel()
 
     trainButton ->setEnabled(false);
     uploadButton->setEnabled(false);
+    evalButton  ->setEnabled(false);
     progressBar ->setVisible(true);
     statusBar()->showMessage("Training… please wait");
     resultLabel->setText("Training PCA model – this may take a minute…");
@@ -170,9 +181,11 @@ void MainWindow::trainModel()
                     QString("Trained: %1 images, %2 subjects, %3 components, model saved")
                     .arg(loaded).arg(subjects).arg(rec->numComponents()));
                 uploadButton->setEnabled(true);
+                evalButton->setEnabled(true);
             } else {
                 resultLabel->setText("Model trained but failed to save to disk.");
                 uploadButton->setEnabled(true);
+                evalButton->setEnabled(true);
             }
         }
         watcher->deleteLater();
@@ -233,4 +246,57 @@ void MainWindow::uploadImage()
         pix.scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
 
     statusBar()->showMessage("Done – " + QFileInfo(fileName).fileName());
+}
+
+void MainWindow::evaluateModel()
+{
+    QString testDir = QFileDialog::getExistingDirectory(
+        this, "Select Test Folder (contains personID_filename.jpg)",
+        QDir::currentPath());
+
+    if (testDir.isEmpty()) return;
+
+    trainButton ->setEnabled(false);
+    uploadButton->setEnabled(false);
+    evalButton  ->setEnabled(false);
+    progressBar ->setVisible(true);
+    statusBar()->showMessage("Evaluating test set… please wait");
+    resultLabel->setText("Evaluating model on test set. This may take a minute…");
+
+    FaceRecognizer *rec = &m_recognizer;
+
+    auto *watcher = new QFutureWatcher<EvaluationResult>(this);
+    connect(watcher, &QFutureWatcher<EvaluationResult>::finished, this, [=]() {
+        EvaluationResult result = watcher->result();
+        progressBar->setVisible(false);
+        trainButton->setEnabled(true);
+        uploadButton->setEnabled(true);
+        evalButton->setEnabled(true);
+
+        if (result.totalImages == 0) {
+            resultLabel->setText("Evaluation failed – no faces found in the selected folder.");
+            statusBar()->showMessage("Evaluation failed.");
+        } else {
+            resultLabel->setText(
+                QString("Evaluation Complete!\n"
+                        "Total Images: %1  |  Correct: %2\n"
+                        "Accuracy: %3%  |  AUC: %4")
+                .arg(result.totalImages)
+                .arg(result.correctImages)
+                .arg(static_cast<int>(result.accuracy * 100))
+                .arg(result.auc, 0, 'f', 3));
+            statusBar()->showMessage("Evaluation complete.");
+
+            // Show ROC curve dialog
+            ROCPlotDialog dlg(result.rocPoints, result.auc, this);
+            dlg.exec();
+        }
+        watcher->deleteLater();
+    });
+
+    watcher->setFuture(
+        QtConcurrent::run([rec, testDir]() -> EvaluationResult {
+            return ModelEvaluator::evaluate(*rec, testDir);
+        })
+    );
 }

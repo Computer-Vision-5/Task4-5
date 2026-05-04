@@ -21,10 +21,12 @@ private slots:
     void uploadImage();
     void trainModel();
     void loadExistingModel();
+    void evaluateModel();
 
 private:
     QPushButton  *uploadButton;
     QPushButton  *trainButton;
+    QPushButton  *evalButton;
     QLabel       *imageLabel;
     QLabel       *resultLabel;
     QProgressBar *progressBar;
