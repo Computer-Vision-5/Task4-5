@@ -19,8 +19,8 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(DEMO OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(libfacedetection)
 
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Gui Widgets)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Widgets)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Gui Widgets Concurrent)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Widgets Concurrent)
 
 add_executable(FaceRecognition
   main.cpp
@@ -28,6 +28,8 @@ add_executable(FaceRecognition
   frontend/mainwindow.h
   backend/FaceDetector.cpp
   backend/FaceDetector.h
+  backend/FaceRecognizer.cpp
+  backend/FaceRecognizer.h
 )
 
 target_include_directories(FaceRecognition PRIVATE 
@@ -43,6 +45,7 @@ target_link_libraries(FaceRecognition PRIVATE
     Qt${QT_VERSION_MAJOR}::Core 
     Qt${QT_VERSION_MAJOR}::Gui 
     Qt${QT_VERSION_MAJOR}::Widgets
+    Qt${QT_VERSION_MAJOR}::Concurrent
     facedetection
 )
 
