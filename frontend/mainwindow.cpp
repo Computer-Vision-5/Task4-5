@@ -3,10 +3,8 @@
 #include <QFileDialog>
 #include <QPainter>
 #include <QDir>
-#include "facedetectcnn.h"
+#include "../backend/FaceDetector.h"
 
-// Define a macro for facedetect bounding box processing
-#define DETECT_BUFFER_SIZE 0x20000
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -96,79 +94,11 @@ void MainWindow::uploadImage()
         }
 
         // Process the image for face detection
-        detectFaces(image);
+        FaceDetector::processImage(image);
 
         // Display the processed image
         // Scale it to fit the label while keeping aspect ratio
         QPixmap pixmap = QPixmap::fromImage(image);
         imageLabel->setPixmap(pixmap.scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
     }
-}
-
-void MainWindow::detectFaces(QImage &image)
-{
-    // Convert image to a format suitable for libfacedetection
-    // libfacedetection requires an unsigned char array of BGR values.
-    // QImage::Format_RGB888 is RGB, so we need to convert it and swap R and B.
-    
-    QImage rgbImage = image.convertToFormat(QImage::Format_RGB888);
-    
-    // Convert RGB to BGR for libfacedetection
-    // QImage::rgbSwapped() swaps Red and Blue channels
-    QImage bgrImage = rgbImage.rgbSwapped();
-
-    int width = bgrImage.width();
-    int height = bgrImage.height();
-    int step = bgrImage.bytesPerLine();
-    
-    unsigned char *pBuffer = new unsigned char[DETECT_BUFFER_SIZE];
-    
-    // facedetect_cnn parameters:
-    // pBuffer: buffer memory for storing the results
-    // result_buffer: memory buffer size
-    // bgrImage.bits(): BGR image data
-    // width: image width
-    // height: image height
-    // step: bytes per line
-    
-    int * pResults = facedetect_cnn(pBuffer, bgrImage.bits(), width, height, step);
-
-    QPainter painter(&image);
-    painter.setPen(QPen(Qt::green, 3));
-    
-    int faceCount = (pResults ? *pResults : 0);
-    
-    for (int i = 0; i < faceCount; i++) {
-        // facedetect_cnn output format for each face:
-        // ptr[0]: confidence
-        // ptr[1]: x
-        // ptr[2]: y
-        // ptr[3]: w
-        // ptr[4]: h
-        // The rest are facial landmarks.
-        // The size of each face record is 142 shorts usually. 
-        
-        short * p = ((short*)(pResults + 1)) + 142 * i;
-        int confidence = p[0];
-        int x = p[1];
-        int y = p[2];
-        int w = p[3];
-        int h = p[4];
-
-        // Draw rectangle around the face
-        painter.drawRect(x, y, w, h);
-        
-        // Draw confidence
-        painter.setFont(QFont("Arial", 12, QFont::Bold));
-        
-        // Add a nice background for the text
-        QRect textRect(x, y - 20, 100, 20);
-        painter.fillRect(textRect, QColor(0, 255, 0, 128));
-        
-        painter.setPen(Qt::black);
-        painter.drawText(x + 2, y - 5, QString("Face: %1%").arg(confidence));
-        painter.setPen(QPen(Qt::green, 3));
-    }
-
-    delete[] pBuffer;
 }

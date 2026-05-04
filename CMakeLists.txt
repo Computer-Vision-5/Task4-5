@@ -24,13 +24,19 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Widgets)
 
 add_executable(FaceRecognition
   main.cpp
-  mainwindow.cpp
-  mainwindow.h
+  frontend/mainwindow.cpp
+  frontend/mainwindow.h
+  backend/FaceDetector.cpp
+  backend/FaceDetector.h
 )
+
 target_include_directories(FaceRecognition PRIVATE 
     ${libfacedetection_SOURCE_DIR}/src 
     ${CMAKE_BINARY_DIR}
+    frontend
+    backend
 )
+
 find_package(OpenMP)
 
 target_link_libraries(FaceRecognition PRIVATE 
@@ -49,3 +55,21 @@ install(TARGETS FaceRecognition
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+# Deployment logic for Windows
+if(WIN32)
+    get_target_property(_qt_executable Qt${QT_VERSION_MAJOR}::Core IMPORTED_LOCATION_RELEASE)
+    if(NOT _qt_executable)
+        get_target_property(_qt_executable Qt${QT_VERSION_MAJOR}::Core IMPORTED_LOCATION_DEBUG)
+    endif()
+    get_filename_component(_qt_bin_dir "${_qt_executable}" DIRECTORY)
+    find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${_qt_bin_dir}")
+
+    if(WINDEPLOYQT_EXECUTABLE)
+        add_custom_command(TARGET FaceRecognition POST_BUILD
+            COMMAND "${WINDEPLOYQT_EXECUTABLE}" "$<TARGET_FILE:FaceRecognition>"
+            COMMENT "Deploying Qt dependencies..."
+        )
+    endif()
+endif()
+

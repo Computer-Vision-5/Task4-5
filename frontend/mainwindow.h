@@ -17,7 +17,6 @@ private slots:
     void uploadImage();
 
 private:
-    void detectFaces(QImage &image);
 
     QPushButton *uploadButton;
     QLabel *imageLabel;
