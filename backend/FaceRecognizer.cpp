@@ -1,4 +1,5 @@
 #include "FaceRecognizer.h"
+#include "facedetect_common.h"   // FACEDETECT_BUFFER_SIZE, FACEDETECT_RESULT_STRIDE
 #include "facedetectcnn.h"
 
 #include <QDir>
@@ -20,7 +21,6 @@
 #include <memory>
 #include <random>
 
-#define DETECT_BUFFER_SIZE 0x20000
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Constructor
@@ -63,7 +63,7 @@ FaceRecognizer::DetectResult FaceRecognizer::detectAndCrop(const QImage &img) co
     int step   = bgr.bytesPerLine();
 
     // RAII buffer — never leaks, even on early return
-    auto pBuffer = std::make_unique<unsigned char[]>(DETECT_BUFFER_SIZE);
+    auto pBuffer = std::make_unique<unsigned char[]>(FACEDETECT_BUFFER_SIZE);
 
     int *pResults = facedetect_cnn(pBuffer.get(),
                                    const_cast<unsigned char*>(bgr.bits()),
@@ -77,8 +77,8 @@ FaceRecognizer::DetectResult FaceRecognizer::detectAndCrop(const QImage &img) co
     int bestIdx  = 0;
     int bestArea = 0;
     for (int i = 0; i < faceCount; ++i) {
-        // FIX: offset pointer by 142*i so we examine the correct face entry
-        short *p = ((short*)(pResults + 1)) + 142 * i;
+        // Stride is FACEDETECT_RESULT_STRIDE (16) shorts per face — see facedetect_common.h
+        short *p = ((short*)(pResults + 1)) + FACEDETECT_RESULT_STRIDE * i;
         int w = p[3], h = p[4];
         if (w * h > bestArea) {
             bestArea = w * h;
@@ -87,7 +87,7 @@ FaceRecognizer::DetectResult FaceRecognizer::detectAndCrop(const QImage &img) co
     }
 
     // FIX: use bestIdx, not 0, when reading the final bounding box
-    short *p = ((short*)(pResults + 1)) + 142 * bestIdx;
+    short *p = ((short*)(pResults + 1)) + FACEDETECT_RESULT_STRIDE * bestIdx;
     int x = p[1], y = p[2], w = p[3], h = p[4];
 
     // Clamp to image bounds
