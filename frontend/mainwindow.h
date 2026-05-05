@@ -18,13 +18,15 @@ public:
     ~MainWindow();
 
 private slots:
-    void uploadImage();
+    void detectImage();      // detection-only: green boxes, no identity (no model needed)
+    void recognizeImage();   // full recognition: blue box + name (requires trained model)
     void trainModel();
     void loadExistingModel();
     void evaluateModel();
 
 private:
-    QPushButton  *uploadButton;
+    QPushButton  *detectButton;   // always enabled — runs FaceDetector only
+    QPushButton  *uploadButton;   // enabled after model is trained/loaded — runs FaceRecognizer
     QPushButton  *trainButton;
     QPushButton  *evalButton;
     QLabel       *imageLabel;

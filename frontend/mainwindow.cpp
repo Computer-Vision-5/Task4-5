@@ -47,20 +47,26 @@ MainWindow::MainWindow(QWidget *parent)
 
     // ── Button row ───────────────────────────────────────────────────────────
     trainButton  = new QPushButton("Train on Dataset",        this);
-    uploadButton = new QPushButton("Recognize Single Image",  this);
+    detectButton = new QPushButton("Detect Faces",            this);   // NEW — no model needed
+    uploadButton = new QPushButton("Recognize Face",          this);   // renamed for clarity
     evalButton   = new QPushButton("Evaluate Test Set",       this);
 
     trainButton ->setStyleSheet(makeButtonStyle("#198754", "#157347", "#146c43"));
+    detectButton->setStyleSheet(makeButtonStyle("#6f42c1", "#5a32a3", "#4b2896"));  // purple
     uploadButton->setStyleSheet(makeButtonStyle("#0d6efd", "#0b5ed7", "#0a58ca"));
     evalButton  ->setStyleSheet(makeButtonStyle("#ffc107", "#ffb300", "#ff8f00"));
     evalButton  ->setStyleSheet(evalButton->styleSheet() + "QPushButton { color: #212529; }"); // Dark text for yellow button
 
+    // detectButton is always available — FaceDetector needs no trained model.
+    // uploadButton and evalButton require a trained/loaded model.
     uploadButton->setEnabled(false);
     evalButton->setEnabled(false);
 
     QHBoxLayout *btnRow = new QHBoxLayout();
     btnRow->addStretch();
     btnRow->addWidget(trainButton);
+    btnRow->addSpacing(12);
+    btnRow->addWidget(detectButton);
     btnRow->addSpacing(12);
     btnRow->addWidget(uploadButton);
     btnRow->addSpacing(12);
@@ -102,7 +108,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     // ── Connections ──────────────────────────────────────────────────────────
     connect(trainButton,  &QPushButton::clicked, this, &MainWindow::trainModel);
-    connect(uploadButton, &QPushButton::clicked, this, &MainWindow::uploadImage);
+    connect(detectButton, &QPushButton::clicked, this, &MainWindow::detectImage);
+    connect(uploadButton, &QPushButton::clicked, this, &MainWindow::recognizeImage);
     connect(evalButton,   &QPushButton::clicked, this, &MainWindow::evaluateModel);
 
     // Try to load a previously saved model as soon as the event loop starts
@@ -200,10 +207,14 @@ void MainWindow::trainModel()
     );
 }
 
-void MainWindow::uploadImage()
+// ── detectImage() ────────────────────────────────────────────────────────────
+// Detection-only path: runs FaceDetector::processImage() and draws green boxes
+// for every face found.  No model is required — this button is always enabled.
+
+void MainWindow::detectImage()
 {
     QString fileName = QFileDialog::getOpenFileName(
-        this, "Open Query Image",
+        this, "Open Image for Face Detection",
         QDir::currentPath(),
         "Image Files (*.png *.jpg *.jpeg *.bmp)");
 
@@ -215,37 +226,56 @@ void MainWindow::uploadImage()
         return;
     }
 
-    // ── Face detection (green boxes) ─────────────────────────────────────────
     FaceDetector::processImage(image);
-
-    // ── Face recognition (blue box + label), if a model is loaded ────────────
-    QString recognitionText = "Detection complete (no model loaded).";
-    if (m_recognizer.isTrained()) {
-        // Load a fresh copy so recognition can draw its own overlay independently
-        QImage imgForRecog(fileName);
-        double  confidence  = 0.0;
-        QString personId    = m_recognizer.recognize(imgForRecog, confidence);
-
-        if (!personId.isEmpty()) {
-            // Composite the recognition overlay onto the detection image
-            QPainter p(&image);
-            p.drawImage(0, 0, imgForRecog);
-
-            recognitionText = QString("Recognized: <b>%1</b>  —  confidence: %2%")
-                .arg(personId)
-                .arg(static_cast<int>(confidence * 100));
-        } else {
-            recognitionText = "No face detected in query image for recognition.";
-        }
-    }
-
-    resultLabel->setText(recognitionText);
 
     QPixmap pix = QPixmap::fromImage(image);
     imageLabel->setPixmap(
         pix.scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
 
-    statusBar()->showMessage("Done – " + QFileInfo(fileName).fileName());
+    resultLabel->setText(
+        "Detection complete – green boxes show every face found by the CNN.\n"
+        "To identify who the faces belong to, use \"Recognize Face\" (requires a trained model).");
+    statusBar()->showMessage("Detection done – " + QFileInfo(fileName).fileName());
+}
+
+// ── recognizeImage() ─────────────────────────────────────────────────────────
+// Full recognition path: runs FaceRecognizer::recognize() which internally
+// detects the largest face, projects it into eigenspace, and finds the nearest
+// neighbour.  Draws a blue box with the person's name and confidence score.
+// Only reachable when a model is trained or loaded (button gated by isTrained).
+
+void MainWindow::recognizeImage()
+{
+    QString fileName = QFileDialog::getOpenFileName(
+        this, "Open Image for Face Recognition",
+        QDir::currentPath(),
+        "Image Files (*.png *.jpg *.jpeg *.bmp)");
+
+    if (fileName.isEmpty()) return;
+
+    QImage image(fileName);
+    if (image.isNull()) {
+        resultLabel->setText("Failed to load image.");
+        return;
+    }
+
+    double  confidence = 0.0;
+    QString personId   = m_recognizer.recognize(image, confidence);
+
+    QPixmap pix = QPixmap::fromImage(image);
+    imageLabel->setPixmap(
+        pix.scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+    if (!personId.isEmpty()) {
+        resultLabel->setText(
+            QString("Recognized: <b>%1</b>  —  confidence: %2%")
+                .arg(personId)
+                .arg(static_cast<int>(confidence * 100)));
+    } else {
+        resultLabel->setText("No face detected in the image.");
+    }
+
+    statusBar()->showMessage("Recognition done – " + QFileInfo(fileName).fileName());
 }
 
 void MainWindow::evaluateModel()
