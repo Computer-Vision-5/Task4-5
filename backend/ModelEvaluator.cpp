@@ -28,7 +28,6 @@ EvaluationResult ModelEvaluator::evaluate(FaceRecognizer& recognizer, const QStr
     QStringList filters = {"*.jpg","*.jpeg","*.png","*.bmp","*.tif","*.tiff"};
     QFileInfoList files = dir.entryInfoList(filters, QDir::Files, QDir::Name);
 
-    // List of predictions: (is_correct, confidence)
     std::vector<std::pair<bool, double>> predictions;
 
     for (const QFileInfo &fi : files) {
@@ -40,10 +39,10 @@ EvaluationResult ModelEvaluator::evaluate(FaceRecognizer& recognizer, const QStr
 
         double confidence = 0.0;
         QString predictedLabel = recognizer.recognize(img, confidence);
-        
+
         bool isCorrect = (!predictedLabel.isEmpty() && predictedLabel == trueLabel);
         predictions.push_back({isCorrect, confidence});
-        
+
         if (isCorrect) {
             result.correctImages++;
         }
@@ -54,21 +53,29 @@ EvaluationResult ModelEvaluator::evaluate(FaceRecognizer& recognizer, const QStr
         result.accuracy = static_cast<double>(result.correctImages) / result.totalImages;
     }
 
-    // Compute ROC Curve points
-    std::sort(predictions.begin(), predictions.end(), 
+    // --- FIX: use actual positive/negative counts ---
+    int totalPositives = result.correctImages;
+    int totalNegatives = result.totalImages - result.correctImages;
+
+    // Guard: AUC is undefined if one class is missing
+    if (totalPositives == 0 || totalNegatives == 0) {
+        qWarning() << "ModelEvaluator: Cannot compute ROC — only one class present in predictions.";
+        result.auc = (totalPositives == result.totalImages) ? 1.0 : 0.0;
+        return result;
+    }
+
+    // Sort by confidence descending (higher confidence = predicted more positive)
+    std::sort(predictions.begin(), predictions.end(),
         [](const std::pair<bool, double>& a, const std::pair<bool, double>& b) {
             return a.second > b.second;
         }
     );
 
-    int totalPositives = result.totalImages; 
-    int totalNegatives = result.totalImages;
-
     int tp = 0;
     int fp = 0;
-    
+
     result.rocPoints.push_back({0.0, 0.0});
-    
+
     double auc = 0.0;
     double prevFpr = 0.0;
     double prevTpr = 0.0;
@@ -79,18 +86,20 @@ EvaluationResult ModelEvaluator::evaluate(FaceRecognizer& recognizer, const QStr
         } else {
             fp++;
         }
+
         double tpr = static_cast<double>(tp) / totalPositives;
         double fpr = static_cast<double>(fp) / totalNegatives;
-        
+
         result.rocPoints.push_back({fpr, tpr});
-        
+
         // Trapezoidal rule for AUC
         auc += (fpr - prevFpr) * (tpr + prevTpr) / 2.0;
-        
+
         prevFpr = fpr;
         prevTpr = tpr;
     }
 
+    // Close the curve to (1.0, 1.0)
     if (prevFpr < 1.0) {
         auc += (1.0 - prevFpr) * (1.0 + prevTpr) / 2.0;
         result.rocPoints.push_back({1.0, 1.0});
